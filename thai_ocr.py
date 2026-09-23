@@ -67,10 +67,25 @@ def clean_thai_text(text: str) -> str:
     # 4. Remove control chars except newline and tab
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
 
-    # 5. Fix inverted vowel + tone mark sequences (e.g. tone mark before upper vowel)
+    # 5. Fix decomposed or broken Sara Am (สระ อำ)
+    # Nikhahit (ํ) + Tone mark + Sara Aa (า) -> Tone mark + Sara Am (ำ)
+    text = re.sub(r'\u0E4D([\u0E48-\u0E4C])\u0E32', r'\g<1>ำ', text)
+    text = re.sub(r'([\u0E48-\u0E4C])\u0E4D\u0E32', r'\g<1>ำ', text)
+    text = re.sub(r'\u0E4D\u0E32', 'ำ', text)
+
+    # Consonant + space + Tone mark + Sara Aa -> Consonant + Tone mark + Sara Am (e.g. ซ ้า -> ซ้ำ)
+    text = re.sub(r'([\u0E01-\u0E2E])\s+([\u0E48-\u0E4C])\u0E32', r'\g<1>\g<2>ำ', text)
+
+    # Consonant + Tone mark + space + Sara Aa -> Consonant + Tone mark + Sara Am (e.g. น้ า -> น้ำ)
+    text = re.sub(r'([\u0E01-\u0E2E])([\u0E48-\u0E4C])\s+\u0E32', r'\g<1>\g<2>ำ', text)
+
+    # Consonant + space + Sara Aa -> Consonant + Sara Am (e.g. ค า -> คำ, ก า -> กำ, ส า -> สำ, ท า -> ทำ)
+    text = re.sub(r'([\u0E01-\u0E2E])\s+\u0E32', r'\g<1>ำ', text)
+
+    # 6. Fix inverted vowel + tone mark sequences (e.g. tone mark before upper vowel)
     text = re.sub(r'([\u0E48-\u0E4C])([\u0E31\u0E34-\u0E37])', r'\2\1', text)
 
-    # 6. Normalize trailing spaces on lines
+    # 7. Normalize trailing spaces on lines
     lines = [re.sub(r'[ \t]+', ' ', line).strip() for line in text.split('\n')]
     result = '\n'.join(lines)
     result = re.sub(r'\n{3,}', '\n\n', result)
