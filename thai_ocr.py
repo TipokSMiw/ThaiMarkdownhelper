@@ -32,7 +32,17 @@ THAI_PUA_MAP = {
     0xF718: 0x0E38,  # สระอุ (shifted)
     0xF719: 0x0E39,  # สระอู (shifted)
     0xF71A: 0x0E3A,  # พินทุ (shifted)
+
+    # Common PDF CID/CMap fallback glitch mappings (e.g. Tahoma font CMap truncating Thai ranges into Cyrillic)
+    0x046C: 0x0E39,  # สระอู (ู) - Cyrillic Iotified Big Yus fallback from CID 0x046c
+    0x047C: 0x0E4D,  # นิคหิต (ํ) - Cyrillic Omega with Titlo fallback from CID 0x047c
+    0x0495: 0x0E48,  # ไม้เอก (่) - Cyrillic Ghe with Middle Hook fallback
+    0x0496: 0x0E49,  # ไม้โท (้) - Cyrillic Zhe with Descender fallback
+    0x0497: 0x0E4A,  # ไม้ตรี (๊)
+    0x0498: 0x0E4B,  # ไม้จัตวา (๋)
+    0x0499: 0x0E4C,  # การันต์ (์)
 }
+
 
 
 def get_ocr_reader():
@@ -85,7 +95,11 @@ def clean_thai_text(text: str) -> str:
     # 6. Fix inverted vowel + tone mark sequences (e.g. tone mark before upper vowel)
     text = re.sub(r'([\u0E48-\u0E4C])([\u0E31\u0E34-\u0E37])', r'\2\1', text)
 
-    # 7. Normalize trailing spaces on lines
+    # 7. Remove spurious space between Thai consonant/vowel and following tone mark (e.g. ผู ้ -> ผู้)
+    text = re.sub(r'([\u0E01-\u0E2E\u0E30-\u0E39])\s+([\u0E48-\u0E4C])', r'\1\2', text)
+
+    # 8. Normalize trailing spaces on lines
+
     lines = [re.sub(r'[ \t]+', ' ', line).strip() for line in text.split('\n')]
     result = '\n'.join(lines)
     result = re.sub(r'\n{3,}', '\n\n', result)
