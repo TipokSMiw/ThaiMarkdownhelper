@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarkItDown Web - แปลงไฟล์เป็น Markdown</title>
+  <!-- Google Fonts & Marked.js for markdown rendering -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --border-hover: #93c5fd;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Prompt', 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .header-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+    }
+    .logo-text h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .logo-text p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .tag-badge {
+      background: #e0f2fe;
+      color: #0369a1;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 960px;
+      width: 100%;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    /* Hero / Upload Box */
+    .upload-card {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 2.5rem;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .drop-zone {
+      border: 2px dashed #cbd5e1;
+      border-radius: var(--radius-md);
+      padding: 3rem 1.5rem;
+      background: #fafafa;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      transform: translateY(-2px);
+    }
+    .drop-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #eff6ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      transition: all 0.2s ease;
+    }
+    .drop-zone:hover .drop-icon {
+      background: var(--primary);
+      color: white;
+    }
+    .drop-text-main {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .drop-text-sub {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .supported-tags {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .format-pill {
+      font-size: 0.725rem;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+
+    /* Selected File Display */
+    .file-details {
+      display: none;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.25rem;
+      margin-top: 1.5rem;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+    }
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      overflow: hidden;
+    }
+    .file-badge-icon {
+      font-size: 1.5rem;
+    }
+    .file-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 450px;
+    }
+    .file-size {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .file-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* OCR Settings Card */
+    .ocr-settings-card {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: var(--radius-md);
+      padding: 1rem 1.25rem;
+      margin-top: 1.25rem;
+      text-align: left;
+    }
+    .ocr-settings-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 0.75rem;
+    }
+    .ocr-icon {
+      font-size: 1.4rem;
+    }
+    .ocr-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .ocr-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .ocr-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .checkbox-container {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--text);
+      user-select: none;
+    }
+    .checkbox-container input {
+      margin-top: 3px;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+    .checkbox-label strong {
+      color: #1e293b;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0.65rem 1.25rem;
+      border-radius: var(--radius-md);
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: none;
+      outline: none;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-outline {
+      background: white;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+    .btn-sm {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    .action-row {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    /* Progress / Loader */
+    .loading-container {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .spinner {
+      display: inline-block;
+      width: 38px;
+      height: 38px;
+      border: 3.5px solid #e2e8f0;
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading-text {
+      margin-top: 12px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .loading-subtext {
+      font-size: 0.825rem;
+      color: var(--text-muted);
+    }
+
+    /* Result Card */
+    .result-card {
+      display: none;
+      margin-top: 2rem;
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .result-header {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: 8px;
+    }
+    .tab-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active {
+      background: white;
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .result-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Markdown Display */
+    .tab-content {
+      padding: 2rem;
+      min-height: 250px;
+      max-height: 650px;
+      overflow-y: auto;
+    }
+    #rawView {
+      display: none;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.88rem;
+      background: #0f172a;
+      color: #f8fafc;
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 1.5rem;
+      border-radius: 8px;
+      user-select: text;
+    }
+
+    /* Rendered Markdown Styles */
+    .markdown-body {
+      font-family: 'Prompt', 'Plus Jakarta Sans', sans-serif;
+      color: #1e293b;
+      line-height: 1.7;
+    }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+      margin-top: 1.4rem;
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .markdown-body h1 { font-size: 1.75rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.4rem; }
+    .markdown-body h2 { font-size: 1.4rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.3rem; }
+    .markdown-body h3 { font-size: 1.15rem; }
+    .markdown-body p { margin-bottom: 1rem; }
+    .markdown-body ul, .markdown-body ol { margin-left: 1.5rem; margin-bottom: 1rem; }
+    .markdown-body li { margin-bottom: 0.35rem; }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.25rem 0;
+      font-size: 0.9rem;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .markdown-body th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+    .markdown-body tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .markdown-body blockquote {
+      border-left: 4px solid #3b82f6;
+      padding-left: 1rem;
+      color: #475569;
+      margin: 1rem 0;
+      font-style: italic;
+      background: #f8fafc;
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+    }
+    .markdown-body pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-family: 'Fira Code', monospace;
+    }
+    .markdown-body code {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.88em;
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #dc2626;
+    }
+    .markdown-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1000;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Error Banner */
+    .error-banner {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-md);
+      margin-top: 1.25rem;
+      font-size: 0.9rem;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      background: white;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-container">
+      <div class="logo-group">
+        <div class="logo-icon">M↓</div>
+        <div class="logo-text">
+          <h1>MarkItDown Web UI</h1>
+          <p>แปลงไฟล์เอกสารเป็น Markdown อัตโนมัติด้วย Microsoft MarkItDown</p>
+        </div>
+      </div>
+      <span class="tag-badge">Powered by Python & MarkItDown</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="upload-card">
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
+        <div class="drop-text-main">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</div>
+        <div class="drop-text-sub">รองรับการแปลงไฟล์หลากหลายรูปแบบเป็น Markdown</div>
+        <div class="supported-tags">
+          <span class="format-pill">PDF (.pdf)</span>
+          <span class="format-pill">Word (.docx)</span>
+          <span class="format-pill">Excel (.xlsx, .xls)</span>
+          <span class="format-pill">PowerPoint (.pptx)</span>
+          <span class="format-pill">Text (.txt, .csv, .json)</span>
+          <span class="format-pill">HTML (.html)</span>
+          <span class="format-pill">Images / Audio</span>
+          <span class="format-pill" style="background: #e0f2fe; color: #0284c7; font-weight: 600;">🇹🇭 Thai OCR Ready</span>
+        </div>
+        <input type="file" id="fileInput" style="display: none;">
+      </div>
+
+      <!-- File details panel -->
+      <div class="file-details" id="fileDetails">
+        <div class="file-info">
+          <span class="file-badge-icon" id="fileBadgeIcon">📄</span>
+          <div>
+            <div class="file-name" id="fileName">example.pdf</div>
+            <div class="file-size" id="fileSize">1.2 MB</div>
+          </div>
+        </div>
+        <div class="file-actions">
+          <button class="btn btn-outline btn-sm" id="btnRemoveFile">เปลี่ยนไฟล์</button>
+        </div>
+      </div>
+
+      <!-- OCR Settings Card -->
+      <div class="ocr-settings-card" id="ocrSettingsCard" style="display: none;">
+        <div class="ocr-settings-header">
+          <span class="ocr-icon">🇹🇭</span>
+          <div>
+            <div class="ocr-title">ระบบ Thai Smart Engine (PUA De-Shifter + EasyOCR)</div>
+            <div class="ocr-subtitle">กู้คืนสระลอย/สระหลุดใน Digital PDF (แม่นยำ 98%+) และดึงข้อความจากภาพสแกน</div>
+          </div>
+        </div>
+        <div class="ocr-options">
+          <label class="checkbox-container">
+            <input type="checkbox" id="chkEnableThaiOcr" checked>
+            <span class="checkbox-label"><strong>เปิดใช้งาน Thai Smart Engine (แนะนำ)</strong> กู้คืนสระไทยที่เพี้ยนใน Digital PDF อัตโนมัติ และสกัดข้อความจากภาพ/PDF สแกน</span>
+          </label>
+          <label class="checkbox-container">
+            <input type="checkbox" id="chkForceOcr">
+            <span class="checkbox-label"><strong>บังคับใช้ EasyOCR กับทุกหน้า</strong> (เลือกเฉพาะเมื่อเป็นเอกสารกระดาษถ่ายเอกสารหรือสแกนทั้งฉบับ)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Convert Action Button -->
+      <div class="action-row" id="actionRow" style="display: none;">
+        <button class="btn btn-primary" id="btnConvert">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          แปลงไฟล์เป็น Markdown
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-container" id="loadingContainer">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">กำลังแปลงไฟล์...</div>
+        <div class="loading-subtext" id="loadingSubtext">ระบบกำลังดึงโครงสร้างและเนื้อหา (หากใช้ Thai OCR จะใช้เวลาประมาณ 1-3 วินาทีต่อหน้า)</div>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-banner" id="errorBanner">
+        <span>⚠️</span>
+        <span id="errorMessage">เกิดข้อผิดพลาดในการแปลงไฟล์</span>
+      </div>
+    </div>
+
+    <!-- Result Card -->
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <div class="tabs">
+          <button class="tab-btn active" id="tabPreviewBtn" onclick="switchTab('preview')">👁️ Preview</button>
+          <button class="tab-btn" id="tabRawBtn" onclick="switchTab('raw')">📝 Raw Markdown</button>
+        </div>
+        <div class="result-buttons">
+          <button class="btn btn-outline btn-sm" id="btnCopy">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            คัดลอก (Copy)
+          </button>
+          <button class="btn btn-primary btn-sm" id="btnDownload">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            ดาวน์โหลด .md
+          </button>
+        </div>
+      </div>
+      <div class="tab-content">
+        <div id="previewView" class="markdown-body"></div>
+        <pre id="rawView"></pre>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast">
+    <span>✅</span>
+    <span id="toastMsg">คัดลอกข้อความ Markdown แล้ว</span>
+  </div>
+
+  <footer>
+    MarkItDown Web Application &bull; Built with Microsoft MarkItDown
+  </footer>
+
+  <script>
+    let selectedFile = null;
+    let convertedMarkdown = "";
+    let outputFilename = "document.md";
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileDetails = document.getElementById('fileDetails');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const fileBadgeIcon = document.getElementById('fileBadgeIcon');
+    const btnRemoveFile = document.getElementById('btnRemoveFile');
+    const ocrSettingsCard = document.getElementById('ocrSettingsCard');
+    const chkEnableThaiOcr = document.getElementById('chkEnableThaiOcr');
+    const chkForceOcr = document.getElementById('chkForceOcr');
+    const actionRow = document.getElementById('actionRow');
+    const btnConvert = document.getElementById('btnConvert');
+    const loadingContainer = document.getElementById('loadingContainer');
+    const loadingText = document.getElementById('loadingText');
+    const loadingSubtext = document.getElementById('loadingSubtext');
+    const errorBanner = document.getElementById('errorBanner');
+    const errorMessage = document.getElementById('errorMessage');
+    const resultCard = document.getElementById('resultCard');
+    const previewView = document.getElementById('previewView');
+    const rawView = document.getElementById('rawView');
+    const tabPreviewBtn = document.getElementById('tabPreviewBtn');
+    const tabRawBtn = document.getElementById('tabRawBtn');
+    const btnCopy = document.getElementById('btnCopy');
+    const btnDownload = document.getElementById('btnDownload');
+    const toast = document.getElementById('toast');
+
+    // Drag & Drop handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    ['dragenter', 'dragover'].forEach(event => {
+      dropZone.addEventListener(event, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(event => {
+      dropZone.addEventListener(event, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+
+    btnRemoveFile.addEventListener('click', () => {
+      resetFile();
+    });
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getFileIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (['pdf'].includes(ext)) return '📕';
+      if (['doc', 'docx'].includes(ext)) return '📘';
+      if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
+      if (['ppt', 'pptx'].includes(ext)) return '📙';
+      if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return '🖼️';
+      if (['mp3', 'wav', 'm4a'].includes(ext)) return '🎵';
+      if (['zip'].includes(ext)) return '🗜️';
+      return '📄';
+    }
+
+    function handleFileSelect(file) {
+      selectedFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = formatBytes(file.size);
+      fileBadgeIcon.textContent = getFileIcon(file.name);
+      
+      fileDetails.style.display = 'flex';
+      ocrSettingsCard.style.display = 'block';
+      actionRow.style.display = 'flex';
+      errorBanner.style.display = 'none';
+      resultCard.style.display = 'none';
+
+      // Auto scroll to action button
+      actionRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function resetFile() {
+      selectedFile = null;
+      fileInput.value = '';
+      fileDetails.style.display = 'none';
+      ocrSettingsCard.style.display = 'none';
+      actionRow.style.display = 'none';
+      errorBanner.style.display = 'none';
+      resultCard.style.display = 'none';
+    }
+
+    // Convert API Call
+    btnConvert.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      const enableThaiOcr = chkEnableThaiOcr ? chkEnableThaiOcr.checked : true;
+      const forceOcr = chkForceOcr ? chkForceOcr.checked : false;
+
+      actionRow.style.display = 'none';
+      loadingContainer.style.display = 'block';
+      errorBanner.style.display = 'none';
+      resultCard.style.display = 'none';
+
+      if (enableThaiOcr) {
+        loadingText.textContent = "กำลังแปลงไฟล์และประมวลผล Thai OCR...";
+        loadingSubtext.textContent = "EasyOCR กำลังสแกนและดึงตัวอักษรภาษาไทย/อังกฤษ กรุณารอสักครู่";
+      } else {
+        loadingText.textContent = "กำลังแปลงไฟล์...";
+        loadingSubtext.textContent = "ระบบกำลังดึงโครงสร้างและเนื้อหาผ่าน MarkItDown";
+      }
+
+      try {
+        const response = await fetch('/api/convert', {
+          method: 'POST',
+          headers: {
+            'X-Filename': encodeURIComponent(selectedFile.name),
+            'Content-Type': selectedFile.type || 'application/octet-stream',
+            'X-Enable-Thai-OCR': enableThaiOcr ? 'true' : 'false',
+            'X-Force-OCR': forceOcr ? 'true' : 'false'
+          },
+          body: selectedFile
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'เกิดข้อผิดพลาดในการแปลงไฟล์');
+        }
+
+        convertedMarkdown = data.markdown || '';
+        const baseName = selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.')) || selectedFile.name;
+        outputFilename = `${baseName}.md`;
+
+        // Render Markdown
+        previewView.innerHTML = marked.parse(convertedMarkdown || '*ไม่มีข้อความจากการแปลงไฟล์*');
+        rawView.textContent = convertedMarkdown;
+
+        loadingContainer.style.display = 'none';
+        actionRow.style.display = 'flex';
+        resultCard.style.display = 'block';
+
+        switchTab('preview');
+        resultCard.scrollIntoView({ behavior: 'smooth' });
+
+      } catch (err) {
+        console.error(err);
+        loadingContainer.style.display = 'none';
+        actionRow.style.display = 'flex';
+        errorMessage.textContent = err.message;
+        errorBanner.style.display = 'flex';
+      }
+    });
+
+    // Tab Switching
+    function switchTab(tab) {
+      if (tab === 'preview') {
+        tabPreviewBtn.classList.add('active');
+        tabRawBtn.classList.remove('active');
+        previewView.style.display = 'block';
+        rawView.style.display = 'none';
+      } else {
+        tabRawBtn.classList.add('active');
+        tabPreviewBtn.classList.remove('active');
+        rawView.style.display = 'block';
+        previewView.style.display = 'none';
+      }
+    }
+
+    // Copy to Clipboard
+    btnCopy.addEventListener('click', async () => {
+      if (!convertedMarkdown) return;
+      try {
+        await navigator.clipboard.writeText(convertedMarkdown);
+        showToast('คัดลอกข้อความ Markdown สำเร็จแล้ว!');
+      } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = convertedMarkdown;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('คัดลอกข้อความ Markdown สำเร็จแล้ว!');
+      }
+    });
+
+    // Download .md File
+    btnDownload.addEventListener('click', () => {
+      if (!convertedMarkdown) return;
+      const blob = new Blob([convertedMarkdown], { type: 'text/markdown;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = outputFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast(`ดาวน์โหลด ${outputFilename} แล้ว`);
+    });
+
+    function showToast(msg) {
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>
