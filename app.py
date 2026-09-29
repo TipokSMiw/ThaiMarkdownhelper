@@ -10,13 +10,16 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
         pass
 
 import json
+import re
 import socket
 import tempfile
 import threading
 import webbrowser
 import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
+
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB max upload limit
 
 # Preload MarkItDown
 try:
@@ -101,32 +104,42 @@ class MarkItDownHandler(BaseHTTPRequestHandler):
                     })
                     return
 
+                if content_length > MAX_FILE_SIZE:
+                    self._send_json(413, {
+                        "success": False,
+                        "error": f"ไฟล์มีขนาดใหญ่เกินไป ({content_length / (1024 * 1024):.1f} MB) ขีดจำกัดสูงสุดคือ 100 MB"
+                    })
+                    return
+
                 # Read OCR configuration headers
                 enable_thai_ocr = self.headers.get("X-Enable-Thai-OCR", "true").lower() in ("true", "1", "yes")
                 force_ocr = self.headers.get("X-Force-OCR", "false").lower() in ("true", "1", "yes")
 
-                # Get filename from X-Filename header
+                # Get filename from X-Filename header and sanitize
                 encoded_filename = self.headers.get("X-Filename", "document.bin")
                 filename = urllib.parse.unquote(encoded_filename)
+                # Keep only basename to prevent path traversal
+                filename = os.path.basename(filename).strip() or "document.bin"
                 
-                # Extract extension
+                # Extract and sanitize extension
                 _, ext = os.path.splitext(filename)
-                ext = ext.lower() if ext else ".bin"
+                ext = re.sub(r'[^a-zA-Z0-9.]', '', ext).lower() if ext else ".bin"
 
-                # Write incoming bytes to a temporary file with matching extension
-                with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_file:
-                    temp_path = tmp_file.name
-                    remaining = content_length
-                    chunk_size = 64 * 1024  # 64 KB chunks
-                    while remaining > 0:
-                        read_bytes = self.rfile.read(min(remaining, chunk_size))
-                        if not read_bytes:
-                            break
-                        tmp_file.write(read_bytes)
-                        remaining -= len(read_bytes)
-
-                # Process conversion with Thai OCR enhancement
+                temp_path = None
                 try:
+                    # Write incoming bytes to a temporary file with matching extension
+                    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_file:
+                        temp_path = tmp_file.name
+                        remaining = content_length
+                        chunk_size = 64 * 1024  # 64 KB chunks
+                        while remaining > 0:
+                            read_bytes = self.rfile.read(min(remaining, chunk_size))
+                            if not read_bytes:
+                                break
+                            tmp_file.write(read_bytes)
+                            remaining -= len(read_bytes)
+
+                    # Process conversion with Thai OCR enhancement
                     image_extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
                     markdown_text = ""
                     title = filename
@@ -161,7 +174,7 @@ class MarkItDownHandler(BaseHTTPRequestHandler):
                     })
                 finally:
                     # Clean up temporary file
-                    if os.path.exists(temp_path):
+                    if temp_path and os.path.exists(temp_path):
                         try:
                             os.remove(temp_path)
                         except OSError:
@@ -196,7 +209,7 @@ def main():
 
     port = args.port if args.port else find_free_port(8080)
     server_address = ("127.0.0.1", port)
-    httpd = HTTPServer(server_address, MarkItDownHandler)
+    httpd = ThreadingHTTPServer(server_address, MarkItDownHandler)
 
     url = f"http://127.0.0.1:{port}"
     print("=" * 60)

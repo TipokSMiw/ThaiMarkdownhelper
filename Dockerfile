@@ -23,7 +23,9 @@ WORKDIR /app
 COPY . /app
 RUN pip --no-cache-dir install \
     /app/packages/markitdown[all] \
-    /app/packages/markitdown-sample-plugin
+    /app/packages/markitdown-sample-plugin \
+    pymupdf \
+    easyocr
 
 # Default USERID and GROUPID
 ARG USERID=nobody
@@ -31,4 +33,6 @@ ARG GROUPID=nogroup
 
 USER $USERID:$GROUPID
 
-ENTRYPOINT [ "markitdown" ]
+EXPOSE 8080
+
+ENTRYPOINT [ "python", "app.py" ]

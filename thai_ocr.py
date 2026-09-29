@@ -46,11 +46,14 @@ THAI_PUA_MAP = {
 
 
 def get_ocr_reader():
-    """Lazy initialization of EasyOCR reader with Thai and English."""
+    """Lazy initialization of EasyOCR reader with Thai and English, auto-detecting GPU."""
     global _easyocr_reader
     if _easyocr_reader is None:
         import easyocr
-        _easyocr_reader = easyocr.Reader(['th', 'en'], gpu=False, verbose=False)
+        import torch
+        use_gpu = torch.cuda.is_available()
+        print(f"[INFO] Initializing EasyOCR (GPU={use_gpu})...")
+        _easyocr_reader = easyocr.Reader(['th', 'en'], gpu=use_gpu, verbose=False)
     return _easyocr_reader
 
 
@@ -88,9 +91,6 @@ def clean_thai_text(text: str) -> str:
 
     # Consonant + Tone mark + space + Sara Aa -> Consonant + Tone mark + Sara Am (e.g. น้ า -> น้ำ)
     text = re.sub(r'([\u0E01-\u0E2E])([\u0E48-\u0E4C])\s+\u0E32', r'\g<1>\g<2>ำ', text)
-
-    # Consonant + space + Sara Aa -> Consonant + Sara Am (e.g. ค า -> คำ, ก า -> กำ, ส า -> สำ, ท า -> ทำ)
-    text = re.sub(r'([\u0E01-\u0E2E])\s+\u0E32', r'\g<1>ำ', text)
 
     # 6. Fix inverted vowel + tone mark sequences (e.g. tone mark before upper vowel)
     text = re.sub(r'([\u0E48-\u0E4C])([\u0E31\u0E34-\u0E37])', r'\2\1', text)
@@ -239,8 +239,9 @@ def extract_page_text_blocks(page) -> str:
             # Check if this block looks like a title or section heading
             is_single_short_line = '\n' not in cleaned and len(cleaned) < 60
             if is_single_short_line and (
-                cleaned.startswith(('หมวดที่', 'บทนำ', 'สารบัญ', 'บทสรุป', 'ข้อแนะนำ', 'ตอนที่'))
-                or re.match(r'^\d{2,3}\s+', cleaned)
+                cleaned.startswith(('หมวดที่', 'บทนำ', 'สารบัญ', 'บทสรุป', 'ข้อแนะนำ', 'ตอนที่', 'บทที่', 'ส่วนที่', 'หัวข้อ'))
+                or re.match(r'^(?:[0-9]{1,2}\.){1,3}\s+\S', cleaned)
+                or re.match(r'^\d{1,2}\.\s+\S', cleaned)
             ):
                 cleaned = f"### {cleaned}"
 
@@ -259,7 +260,10 @@ def ocr_pdf(pdf_path: str, force_ocr: bool = False, dpi: int = 150) -> str:
       2. If page has no text or is a scanned image (or force_ocr is True):
          Renders page to image and runs EasyOCR (with Thai + English).
     """
-    import fitz  # PyMuPDF
+    try:
+        import pymupdf as fitz
+    except ImportError:
+        import fitz
 
     doc = fitz.open(pdf_path)
     page_outputs = []
@@ -272,11 +276,14 @@ def ocr_pdf(pdf_path: str, force_ocr: bool = False, dpi: int = 150) -> str:
         page_num = page_idx + 1
 
         raw_sample = page.get_text("text").replace('\u200b', '').strip()
-        has_thai_text = bool(re.search(r'[\u0E00-\u0E7F]', raw_sample))
+        clean_sample = clean_thai_text(raw_sample)
+        thai_chars = len(re.findall(r'[\u0E00-\u0E7F]', clean_sample))
+        total_non_ws = len(re.sub(r'\s+', '', clean_sample))
         has_images = len(page.get_images()) > 0
 
-        # Only run heavy OCR if forced or if page lacks Thai text and contains images (e.g. cover page)
-        should_run_ocr = force_ocr or (not has_thai_text and has_images and len(raw_sample) < 20)
+        # Run OCR if forced, or if page has minimal digital text (< 15 chars),
+        # or if page has images but no Thai text and low text density (< 80 chars, typical of scanned doc with watermark/header)
+        should_run_ocr = force_ocr or (total_non_ws < 15 and has_images) or (thai_chars == 0 and total_non_ws < 80 and has_images)
 
         if should_run_ocr:
             print(f"[INFO] Page {page_num}/{total_pages}: Running EasyOCR on image...")

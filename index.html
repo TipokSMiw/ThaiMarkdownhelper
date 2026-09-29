@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
   <style>
     :root {
       --primary: #2563eb;
@@ -762,7 +763,16 @@
       return '📄';
     }
 
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+
     function handleFileSelect(file) {
+      if (file.size > MAX_FILE_SIZE) {
+        errorMessage.textContent = `ไฟล์มีขนาดใหญ่เกินไป (${formatBytes(file.size)}) ขีดจำกัดสูงสุดคือ 100 MB`;
+        errorBanner.style.display = 'flex';
+        resetFile();
+        return;
+      }
+
       selectedFile = file;
       fileName.textContent = file.name;
       fileSize.textContent = formatBytes(file.size);
@@ -784,7 +794,6 @@
       fileDetails.style.display = 'none';
       ocrSettingsCard.style.display = 'none';
       actionRow.style.display = 'none';
-      errorBanner.style.display = 'none';
       resultCard.style.display = 'none';
     }
 
@@ -830,8 +839,9 @@
         const baseName = selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.')) || selectedFile.name;
         outputFilename = `${baseName}.md`;
 
-        // Render Markdown
-        previewView.innerHTML = marked.parse(convertedMarkdown || '*ไม่มีข้อความจากการแปลงไฟล์*');
+        // Render Markdown safely with DOMPurify
+        const rawHtml = marked.parse(convertedMarkdown || '*ไม่มีข้อความจากการแปลงไฟล์*');
+        previewView.innerHTML = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(rawHtml) : rawHtml;
         rawView.textContent = convertedMarkdown;
 
         loadingContainer.style.display = 'none';
